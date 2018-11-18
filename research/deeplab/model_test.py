@@ -137,7 +137,7 @@ class DeeplabModelTest(tf.test.TestCase):
             image_pyramid=[1.0])
         for output in outputs_to_num_classes:
           scales_to_model_results = outputs_to_scales_to_model_results[output]
-          self.assertListEqual(scales_to_model_results.keys(),
+          self.assertListEqual(list(scales_to_model_results.keys()),
                                expected_endpoints)
           self.assertEqual(len(scales_to_model_results), 1)
 
