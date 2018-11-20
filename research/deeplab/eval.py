@@ -47,7 +47,7 @@ flags.DEFINE_integer('eval_batch_size', 1,
 flags.DEFINE_multi_integer('eval_crop_size', [513, 513],
                            'Image crop size [height, width] for evaluation.')
 
-flags.DEFINE_integer('eval_interval_secs', 60 * 5,
+flags.DEFINE_integer('eval_interval_secs', 1,
                      'How often (in seconds) to run evaluation.')
 
 # For `xception_65`, use atrous_rates = [12, 24, 36] if output_stride = 8, or
@@ -80,6 +80,13 @@ flags.DEFINE_string('dataset_dir', None, 'Where the dataset reside.')
 flags.DEFINE_integer('max_number_of_evaluations', 0,
                      'Maximum number of eval iterations. Will loop '
                      'indefinitely upon nonpositive values.')
+
+# Quantization
+flags.DEFINE_boolean('is_quant', False, 'Use low precisions')
+
+flags.DEFINE_integer('weight_bits', None, 'the number of precisions for weight')
+
+flags.DEFINE_integer('activation_bits', None, 'the number of precisions for activation')
 
 
 def main(unused_argv):
@@ -155,6 +162,14 @@ def main(unused_argv):
     tf.logging.info('Eval num images %d', dataset.num_samples)
     tf.logging.info('Eval batch size %d and num batch %d',
                     FLAGS.eval_batch_size, num_batches)
+
+    if FLAGS.is_quant:
+      tf.contrib.quantize.experimental_create_eval_graph(weight_bits=FLAGS.weight_bits, activation_bits=FLAGS.activation_bits)
+      #tf.contrib.quantize.experimental_create_eval_graph(weight_bits=8, activation_bits=8, scope="MobilenetV2")
+      #tf.contrib.quantize.experimental_create_eval_graph(weight_bits=2, activation_bits=2, scope="image_pooling")
+      #tf.contrib.quantize.experimental_create_eval_graph(weight_bits=2, activation_bits=2, scope="aspp0")
+      #tf.contrib.quantize.experimental_create_eval_graph(weight_bits=2, activation_bits=2, scope="concat_projection")
+      #tf.contrib.quantize.experimental_create_eval_graph(weight_bits=2, activation_bits=2, scope="logits")
 
     num_eval_iters = None
     if FLAGS.max_number_of_evaluations > 0:

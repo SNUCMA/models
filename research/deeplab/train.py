@@ -166,6 +166,12 @@ flags.DEFINE_string('train_split', 'train',
 
 flags.DEFINE_string('dataset_dir', None, 'Where the dataset reside.')
 
+# Quantization
+flags.DEFINE_boolean('is_quant', False, 'Use low precisions')
+
+flags.DEFINE_integer('weight_bits', None, 'the number of precisions for weight')
+
+flags.DEFINE_integer('activation_bits', None, 'the number of precisions for activation')
 
 def _build_deeplab(inputs_queue, outputs_to_num_classes, ignore_label):
   """Builds a clone of DeepLab.
@@ -275,7 +281,20 @@ def main(unused_argv):
       model_args = (inputs_queue, {
           common.OUTPUT_TYPE: dataset.num_classes
       }, dataset.ignore_label)
-      clones = model_deploy.create_clones(config, model_fn, args=model_args)
+      
+      def quant_model_fn(*args, **kwargs):
+        outputs = model_fn(*args, **kwargs)
+        if FLAGS.is_quant:
+          tf.contrib.quantize.experimental_create_training_graph(weight_bits=FLAGS.weight_bits, activation_bits=FLAGS.activation_bits)
+          #tf.contrib.quantize.experimental_create_training_graph(weight_bits=8, activation_bits=8, scope="MobilenetV2")
+          #tf.contrib.quantize.experimental_create_training_graph(weight_bits=2, activation_bits=2, scope="image_pooling")
+          #tf.contrib.quantize.experimental_create_training_graph(weight_bits=2, activation_bits=2, scope="aspp0")
+          #tf.contrib.quantize.experimental_create_training_graph(weight_bits=2, activation_bits=2, scope="concat_projection")
+          #tf.contrib.quantize.experimental_create_training_graph(weight_bits=2, activation_bits=2, scope="logits")
+        return outputs
+
+      #clones = model_deploy.create_clones(config, model_fn, args=model_args)
+      clones = model_deploy.create_clones(config, quant_model_fn, args=model_args)
 
       # Gather update_ops from the first clone. These contain, for example,
       # the updates for the batch_norm variables created by model_fn.

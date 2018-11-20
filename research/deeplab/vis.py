@@ -50,7 +50,7 @@ flags.DEFINE_integer('vis_batch_size', 1,
 flags.DEFINE_multi_integer('vis_crop_size', [513, 513],
                            'Crop size [height, width] for visualization.')
 
-flags.DEFINE_integer('eval_interval_secs', 60 * 5,
+flags.DEFINE_integer('eval_interval_secs', 1,
                      'How often (in seconds) to run evaluation.')
 
 # For `xception_65`, use atrous_rates = [12, 24, 36] if output_stride = 8, or
@@ -89,6 +89,13 @@ flags.DEFINE_boolean('also_save_raw_predictions', False,
 flags.DEFINE_integer('max_number_of_iterations', 0,
                      'Maximum number of visualization iterations. Will loop '
                      'indefinitely upon nonpositive values.')
+
+# Quantization
+flags.DEFINE_boolean('is_quant', False, 'Use low precisions')
+
+flags.DEFINE_integer('weight_bits', None, 'the number of precisions for weight')
+
+flags.DEFINE_integer('activation_bits', None, 'the number of precisions for activation')
 
 # The folder where semantic segmentation predictions are saved.
 _SEMANTIC_PREDICTION_SAVE_FOLDER = 'segmentation_results'
@@ -258,6 +265,9 @@ def main(unused_argv):
                                  resized_shape,
                                  method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
                                  align_corners=True), 3)
+
+    if FLAGS.is_quant:
+      tf.contrib.quantize.experimental_create_eval_graph(weight_bits=FLAGS.weight_bits, activation_bits=FLAGS.activation_bits)
 
     tf.train.get_or_create_global_step()
     saver = tf.train.Saver(slim.get_variables_to_restore())

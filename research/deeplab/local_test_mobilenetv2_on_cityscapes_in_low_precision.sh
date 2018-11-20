@@ -49,7 +49,7 @@ cd "${CURRENT_DIR}"
 
 # Set up the working directories.
 CITYSCAPES_FOLDER="cityscapes"
-EXP_FOLDER="exp/train_on_trainval_set_mobilenetv2"
+EXP_FOLDER="exp/train_on_trainval_set_mobilenetv2_low_precision2"
 INIT_FOLDER="${WORK_DIR}/${DATASET_DIR}/${CITYSCAPES_FOLDER}/init_models"
 TRAIN_LOGDIR="${WORK_DIR}/${DATASET_DIR}/${CITYSCAPES_FOLDER}/${EXP_FOLDER}/train"
 EVAL_LOGDIR="${WORK_DIR}/${DATASET_DIR}/${CITYSCAPES_FOLDER}/${EXP_FOLDER}/eval"
@@ -66,8 +66,8 @@ TF_INIT_ROOT="http://download.tensorflow.org/models"
 CKPT_NAME="deeplabv3_mnv2_cityscapes_train"
 TF_INIT_CKPT="${CKPT_NAME}_2018_02_05.tar.gz"
 cd "${INIT_FOLDER}"
-wget -nd -c "${TF_INIT_ROOT}/${TF_INIT_CKPT}"
-tar -xf "${TF_INIT_CKPT}"
+#wget -nd -c "${TF_INIT_ROOT}/${TF_INIT_CKPT}"
+#tar -xf "${TF_INIT_CKPT}"
 cd "${CURRENT_DIR}"
 
 DATASET_VERSION="tiny"
@@ -76,19 +76,22 @@ CITYSCAPES_DATASET="${WORK_DIR}/${DATASET_DIR}/${CITYSCAPES_FOLDER}/tfrecord-${D
 
 # Train 10 iterations.
 NUM_ITERATIONS=10
-python3 "${WORK_DIR}"/train.py \
+CUDA_VISIBLE_DEVICES=0 python3 "${WORK_DIR}"/train.py \
   --logtostderr \
   --train_split="train" \
   --model_variant="mobilenet_v2" \
   --output_stride=16 \
   --train_crop_size=769 \
   --train_crop_size=769 \
-  --train_batch_size=8 \
+  --train_batch_size=4 \
   --dataset="cityscapes_${DATASET_VERSION}" \
   --training_number_of_steps="${NUM_ITERATIONS}" \
   --fine_tune_batch_norm=true \
   --tf_initial_checkpoint="${INIT_FOLDER}/${CKPT_NAME}/model.ckpt" \
   --train_logdir="${TRAIN_LOGDIR}" \
+  --is_quant=true \
+  --weight_bits=8 \
+  --activation_bits=8 \
   --dataset_dir="${CITYSCAPES_DATASET}"
 
 # Run evaluation. This performs eval over the tiny val split (100 images) and
@@ -100,12 +103,15 @@ python3 "${WORK_DIR}"/eval.py \
   --model_variant="mobilenet_v2" \
   --eval_crop_size=1025 \
   --eval_crop_size=2049 \
+  --is_quant=true \
+  --weight_bits=8 \
+  --activation_bits=8 \
   --num_classes=19 \
   --dataset="cityscapes_${DATASET_VERSION}" \
   --checkpoint_dir="${TRAIN_LOGDIR}" \
   --eval_logdir="${EVAL_LOGDIR}" \
   --dataset_dir="${CITYSCAPES_DATASET}" \
-  --max_number_of_evaluations=1
+   --max_number_of_evaluations=1
 
 # Visualize the results.
 python3 "${WORK_DIR}"/vis.py \
@@ -114,6 +120,9 @@ python3 "${WORK_DIR}"/vis.py \
   --model_variant="mobilenet_v2" \
   --vis_crop_size=1025 \
   --vis_crop_size=2049 \
+  --is_quant=true \
+  --weight_bits=8 \
+  --activation_bits=8 \
   --dataset="cityscapes_${DATASET_VERSION}" \
   --colormap_type="cityscapes" \
   --checkpoint_dir="${TRAIN_LOGDIR}" \
