@@ -53,11 +53,18 @@ flags.DEFINE_multi_float('inference_scales', [1.0],
 flags.DEFINE_bool('add_flipped_images', False,
                   'Add flipped images during inference or not.')
 
+flags.DEFINE_boolean('is_quant', False, 'Enable 8bits quantization')
+
+flags.DEFINE_integer('weight_bits', 8, '# of bits for weight quantization')
+
+flags.DEFINE_integer('activation_bits', 8, '# of bits for activation quantization')
+
 # Input name of the exported model.
 _INPUT_NAME = 'ImageTensor'
 
 # Output name of the exported model.
-_OUTPUT_NAME = 'SemanticPredictions'
+#_OUTPUT_NAME = 'SemanticPredictions'
+_OUTPUT_NAME = 'ReshapedArgMax'
 
 
 def _create_input_tensors():
@@ -126,29 +133,39 @@ def main(unused_argv):
           eval_scales=FLAGS.inference_scales,
           add_flipped_images=FLAGS.add_flipped_images)
 
-    # Crop the valid regions from the predictions.
-    semantic_predictions = tf.slice(
-        predictions[common.OUTPUT_TYPE],
-        [0, 0, 0],
-        [1, resized_image_size[0], resized_image_size[1]])
-    # Resize back the prediction to the original image size.
-    def _resize_label(label, label_size):
-      # Expand dimension of label to [1, height, width, 1] for resize operation.
-      label = tf.expand_dims(label, 3)
-      resized_label = tf.image.resize_images(
-          label,
-          label_size,
-          method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
-          align_corners=True)
-      return tf.squeeze(resized_label, 3)
-    semantic_predictions = _resize_label(semantic_predictions, image_size)
-    semantic_predictions = tf.identity(semantic_predictions, name=_OUTPUT_NAME)
+#     # Crop the valid regions from the predictions.
+#     semantic_predictions = tf.slice(
+#         predictions[common.OUTPUT_TYPE],
+#         [0, 0, 0],
+#         [1, resized_image_size[0], resized_image_size[1]])\
+#     # Resize back the prediction to the original image size.
+#     def _resize_label(label, label_size):
+#       # Expand dimension of label to [1, height, width, 1] for resize operation.
+#       label = tf.expand_dims(label, 3)
+#       resized_label = tf.image.resize_images(
+#           label,
+#           label_size,
+#           method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+#           align_corners=True)
+#       return tf.squeeze(resized_label, 3)
+#     semantic_predictions = _resize_label(semantic_predictions, image_size)
+#     semantic_predictions = tf.identity(semantic_predictions, name=_OUTPUT_NAME)
+    reshaped_predictions = tf.reshape(predictions[common.OUTPUT_TYPE], [1, -1], name='ReshapedArgMax')
+  
+    if FLAGS.is_quant:
+      tf.contrib.quantize.experimental_create_eval_graph(graph, weight_bits=FLAGS.weight_bits, activation_bits=FLAGS.activation_bits)
 
     saver = tf.train.Saver(tf.model_variables())
+    
+    graph_def = graph.as_graph_def()
+    with gfile.GFile(FLAGS.export_path.replace('frozen_inference_graph', 'saved_graph'), 'wb') as f:
+      f.write(graph_def.SerializeToString())
 
     tf.gfile.MakeDirs(os.path.dirname(FLAGS.export_path))
+    graph_def = graph.as_graph_def(add_shapes=True)
     freeze_graph.freeze_graph_with_def_protos(
-        tf.get_default_graph().as_graph_def(add_shapes=True),
+#         tf.get_default_graph().as_graph_def(add_shapes=True),
+        graph_def,
         saver.as_saver_def(),
         FLAGS.checkpoint_path,
         _OUTPUT_NAME,
